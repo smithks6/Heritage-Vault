@@ -1,0 +1,116 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg: theme("colors.parchment.100");
+    --color-surface: theme("colors.parchment.50");
+    --color-border: theme("colors.parchment.300");
+    --color-text: theme("colors.bark.800");
+    --color-muted: theme("colors.bark.400");
+    --color-primary: theme("colors.bark.600");
+    --color-primary-hover: theme("colors.bark.700");
+    --color-accent: theme("colors.amber.600");
+  }
+
+  html {
+    background-color: var(--color-bg);
+    color: var(--color-text);
+  }
+
+  body {
+    @apply antialiased;
+    font-family: var(--font-geist-sans, system-ui, sans-serif);
+  }
+
+  h1, h2, h3 {
+    @apply font-serif;
+    color: var(--color-primary);
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center gap-2 rounded-lg px-5 py-2.5
+           bg-bark-600 text-parchment-50 font-medium text-sm
+           hover:bg-bark-700 active:scale-95
+           transition-all duration-150
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 rounded-lg px-5 py-2.5
+           bg-parchment-200 text-bark-700 font-medium text-sm
+           hover:bg-parchment-300 active:scale-95
+           transition-all duration-150
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 rounded-lg px-4 py-2
+           text-bark-500 font-medium text-sm
+           hover:bg-parchment-200 active:scale-95
+           transition-all duration-150
+           focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500;
+  }
+
+  .card {
+    @apply rounded-xl bg-parchment-50 border border-parchment-300
+           shadow-sm p-5;
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-parchment-300 bg-white
+           px-3.5 py-2.5 text-sm text-bark-800 placeholder-bark-300
+           focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent
+           transition-shadow;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5
+           text-xs font-medium;
+  }
+
+  .badge-amber {
+    @apply badge bg-amber-100 text-amber-700;
+  }
+
+  .badge-green {
+    @apply badge bg-green-100 text-green-700;
+  }
+
+  .badge-gray {
+    @apply badge bg-parchment-200 text-bark-500;
+  }
+}
+
+/* Recording pulse animation */
+@keyframes pulse-record {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.08); }
+}
+
+.animate-record {
+  animation: pulse-record 1.2s ease-in-out infinite;
+}
+
+/* Waveform bars */
+@keyframes waveform {
+  0%, 100% { height: 4px; }
+  50% { height: 100%; }
+}
+
+.waveform-bar {
+  width: 3px;
+  border-radius: 9999px;
+  background-color: theme("colors.amber.500");
+  animation: waveform 0.8s ease-in-out infinite;
+}
+
+/* Transcript highlight */
+.word-active {
+  background-color: theme("colors.amber.200");
+  border-radius: 2px;
+  padding: 0 1px;
+}
