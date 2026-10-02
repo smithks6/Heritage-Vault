@@ -3,11 +3,17 @@
 export const dynamic = "force-dynamic";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { BookOpen, Mail, ArrowRight, Loader2 } from "lucide-react";
+import { BookOpen, Mail, ArrowRight, Loader2, KeyRound } from "lucide-react";
+
+type Mode = "magic" | "password";
 
 export default function LoginPage() {
+  const router = useRouter();
+  const [mode, setMode] = useState<Mode>("password");
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -18,18 +24,22 @@ export default function LoginPage() {
     setLoading(true);
     setError(null);
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    setLoading(false);
-    if (error) {
-      setError(error.message);
+    if (mode === "password") {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      setLoading(false);
+      if (error) {
+        setError(error.message);
+      } else {
+        router.push("/tree");
+      }
     } else {
-      setSent(true);
+      const { error } = await supabase.auth.signInWithOtp({
+        email,
+        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+      });
+      setLoading(false);
+      if (error) setError(error.message);
+      else setSent(true);
     }
   }
 
@@ -66,10 +76,33 @@ export default function LoginPage() {
           </div>
         ) : (
           <>
-            <h2 className="font-serif text-xl text-bark-700 mb-1">Sign in</h2>
-            <p className="text-sm text-bark-400 mb-5">
-              Enter your email and we&apos;ll send you a sign-in link.
-            </p>
+            {/* Mode toggle */}
+            <div className="flex rounded-lg border border-parchment-300 p-0.5 mb-5 bg-parchment-100">
+              <button
+                type="button"
+                onClick={() => { setMode("password"); setError(null); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-1.5 text-sm font-medium transition-all ${
+                  mode === "password"
+                    ? "bg-white text-bark-700 shadow-sm"
+                    : "text-bark-400 hover:text-bark-600"
+                }`}
+              >
+                <KeyRound className="w-3.5 h-3.5" />
+                Password
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode("magic"); setError(null); }}
+                className={`flex-1 flex items-center justify-center gap-1.5 rounded-md py-1.5 text-sm font-medium transition-all ${
+                  mode === "magic"
+                    ? "bg-white text-bark-700 shadow-sm"
+                    : "text-bark-400 hover:text-bark-600"
+                }`}
+              >
+                <Mail className="w-3.5 h-3.5" />
+                Magic link
+              </button>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
@@ -88,17 +121,40 @@ export default function LoginPage() {
                 />
               </div>
 
+              {mode === "password" && (
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-bark-600 mb-1.5">
+                    Password
+                  </label>
+                  <input
+                    id="password"
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="input"
+                  />
+                </div>
+              )}
+
               {error && (
                 <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
               )}
 
               <button
                 type="submit"
-                disabled={loading || !email}
+                disabled={loading || !email || (mode === "password" && !password)}
                 className="btn-primary w-full justify-center"
               >
                 {loading ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
+                ) : mode === "password" ? (
+                  <>
+                    Sign in
+                    <ArrowRight className="w-4 h-4" />
+                  </>
                 ) : (
                   <>
                     Send magic link
