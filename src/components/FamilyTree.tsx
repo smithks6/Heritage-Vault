@@ -1,144 +1,209 @@
 "use client";
 
 /**
- * FamilyTree — visual family tree renderer.
+ * FamilyTree — generation rows with SVG connector lines.
  *
- * Sprint 1 note: This is a CSS-grid placeholder that correctly models the
- * GEDCOM data shape (people + family_units) and passes Gate 1 requirements.
- * Sprint 6 spike will replace the layout engine with `family-chart` or
- * `d3-dag` based on the Week 3 verdict (remarriage + adopted-child test).
- *
- * Design: generations as horizontal rows, family units as vertical connectors.
+ * Layout: people grouped into generation rows, partners ordered adjacently.
+ * After mount, DOM positions are measured and SVG lines are drawn for:
+ *   - Couple connections (amber horizontal line between partners)
+ *   - Parent→child branches (parchment lines dropping to children)
  */
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useLayoutEffect, useCallback } from "react";
 import Link from "next/link";
-import { User, Mic, ChevronRight } from "lucide-react";
+import { User, Mic } from "lucide-react";
 import type { FamilyGraph, FamilyNode } from "@/types";
 
 interface Props {
   graph: FamilyGraph;
 }
 
+interface LineSpec {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  type: "partner" | "branch";
+}
+
 export default function FamilyTreeView({ graph }: Props) {
   const [highlight, setHighlight] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [lines, setLines] = useState<LineSpec[]>([]);
+  const [svgSize, setSvgSize] = useState({ w: 0, h: 0 });
 
-  // Assign generation depths via BFS from root nodes
+  // Generation depth via BFS from roots
   const generations = useMemo(() => computeGenerations(graph), [graph]);
-
   const maxGen = Math.max(...Object.values(generations), 0);
-  const nodeById: Record<string, FamilyNode> = {};
-  for (const n of graph.nodes) nodeById[n.id] = n;
 
-  // Group people by generation
-  const byGen: FamilyNode[][] = [];
-  for (let g = 0; g <= maxGen; g++) {
-    byGen[g] = graph.nodes.filter((n) => generations[n.id] === g);
-  }
+  // Group people per generation, with partners placed adjacently
+  const byGen = useMemo(() => {
+    const rows: FamilyNode[][] = [];
+    for (let g = 0; g <= maxGen; g++) {
+      const genPeople = graph.nodes.filter((n) => generations[n.id] === g);
+      rows[g] = orderPartnersAdjacent(genPeople, graph);
+    }
+    return rows;
+  }, [graph, generations, maxGen]);
+
+  // Measure DOM positions → compute SVG lines
+  const computeLines = useCallback(() => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const cRect = container.getBoundingClientRect();
+    setSvgSize({ w: cRect.width, h: cRect.height });
+
+    const newLines: LineSpec[] = [];
+
+    function cardRect(personId: string): DOMRect | null {
+      const el = container!.querySelector<HTMLElement>(`[data-pid="${personId}"]`);
+      return el ? el.getBoundingClientRect() : null;
+    }
+
+    for (const unit of graph.units) {
+      if (unit.partners.length < 2) continue;
+
+      const partnerRects = unit.partners
+        .map((id) => cardRect(id))
+        .filter((r): r is DOMRect => r !== null);
+      if (partnerRects.length < 2) continue;
+
+      partnerRects.sort((a, b) => a.left - b.left);
+      const leftR = partnerRects[0];
+      const rightR = partnerRects[partnerRects.length - 1];
+
+      const py = (leftR.top + leftR.bottom) / 2 - cRect.top;
+      const lx = leftR.right - cRect.left;
+      const rx = rightR.left - cRect.left;
+      const coupleX = (leftR.left + leftR.right + rightR.left + rightR.right) / 4 - cRect.left;
+
+      // Horizontal couple line
+      newLines.push({ x1: lx, y1: py, x2: rx, y2: py, type: "partner" });
+
+      if (unit.children.length === 0) continue;
+
+      const childRects = unit.children
+        .map((id) => cardRect(id))
+        .filter((r): r is DOMRect => r !== null);
+      if (childRects.length === 0) continue;
+
+      childRects.sort((a, b) => a.left - b.left);
+
+      const childTopY = Math.min(...childRects.map((r) => r.top)) - cRect.top;
+      const midY = py + (childTopY - py) * 0.5;
+
+      // Vertical drop from couple centre
+      newLines.push({ x1: coupleX, y1: py, x2: coupleX, y2: midY, type: "branch" });
+
+      // Horizontal branch spanning children
+      const bLeft = (childRects[0].left + childRects[0].right) / 2 - cRect.left;
+      const bRight =
+        (childRects[childRects.length - 1].left + childRects[childRects.length - 1].right) / 2 -
+        cRect.left;
+
+      const branchL = Math.min(bLeft, coupleX);
+      const branchR = Math.max(bRight, coupleX);
+      newLines.push({ x1: branchL, y1: midY, x2: branchR, y2: midY, type: "branch" });
+
+      // Vertical drops to each child
+      for (const cr of childRects) {
+        const cx = (cr.left + cr.right) / 2 - cRect.left;
+        const cy = cr.top - cRect.top;
+        newLines.push({ x1: cx, y1: midY, x2: cx, y2: cy, type: "branch" });
+      }
+    }
+
+    setLines(newLines);
+  }, [graph]);
+
+  useLayoutEffect(() => {
+    const run = () => setTimeout(computeLines, 30);
+    run();
+    const ro = new ResizeObserver(run);
+    if (containerRef.current) ro.observe(containerRef.current);
+    return () => ro.disconnect();
+  }, [computeLines, byGen]);
 
   return (
     <div className="space-y-4">
       {/* Legend */}
-      <div className="flex items-center gap-4 text-xs text-bark-400">
+      <div className="flex flex-wrap items-center gap-4 text-xs text-bark-400">
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-full bg-bark-600 inline-block" />
           Member
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-full bg-amber-500 inline-block" />
-          Light contributor
+          Contributor
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded-full bg-parchment-400 inline-block" />
           Remembered
         </span>
+        <span className="flex items-center gap-1.5 ml-auto">
+          <span className="inline-block w-6 h-0.5 bg-amber-500" />
+          Partners
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="inline-block w-6 h-0.5 bg-parchment-400" />
+          Parent–child
+        </span>
       </div>
 
-      {/* Tree — horizontal scroll for wide families */}
-      <div className="overflow-x-auto pb-4">
-        <div className="min-w-max space-y-8">
-          {byGen.map((nodes, gen) => (
-            <div key={gen}>
-              <div className="text-xs text-bark-400 mb-3 font-medium uppercase tracking-wide">
-                Generation {gen + 1}
+      {/* Tree canvas */}
+      <div className="overflow-x-auto pb-6">
+        <div ref={containerRef} className="relative min-w-max">
+          {/* SVG connector overlay */}
+          {svgSize.w > 0 && (
+            <svg
+              className="absolute inset-0 pointer-events-none overflow-visible"
+              width={svgSize.w}
+              height={svgSize.h}
+              aria-hidden="true"
+            >
+              {lines.map((ln, i) => (
+                <line
+                  key={i}
+                  x1={ln.x1}
+                  y1={ln.y1}
+                  x2={ln.x2}
+                  y2={ln.y2}
+                  stroke={ln.type === "partner" ? "#d97706" : "#c4b49a"}
+                  strokeWidth={ln.type === "partner" ? 2 : 1.5}
+                  strokeLinecap="round"
+                />
+              ))}
+            </svg>
+          )}
+
+          {/* Generation rows */}
+          <div className="space-y-16">
+            {byGen.map((nodes, gen) => (
+              <div key={gen}>
+                <div className="text-xs text-bark-400 mb-4 font-medium uppercase tracking-wide">
+                  Generation {gen + 1}
+                </div>
+                <div className="flex flex-wrap gap-5">
+                  {nodes.map((node) => (
+                    <PersonCard
+                      key={node.id}
+                      node={node}
+                      isHighlighted={highlight === node.id}
+                      onHover={setHighlight}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="flex flex-wrap gap-3">
-                {nodes.map((node) => (
-                  <PersonCard
-                    key={node.id}
-                    node={node}
-                    isHighlighted={highlight === node.id}
-                    onHover={setHighlight}
-                    units={graph.units.filter(
-                      (u) =>
-                        u.partners.includes(node.id) ||
-                        u.children.includes(node.id)
-                    )}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
-
-      {/* Family units — relationship summary */}
-      {graph.units.length > 0 && (
-        <details className="mt-2">
-          <summary className="cursor-pointer text-sm text-bark-400 hover:text-bark-600 transition-colors select-none">
-            {graph.units.length} family unit{graph.units.length !== 1 ? "s" : ""} ↓
-          </summary>
-          <div className="mt-3 space-y-2">
-            {graph.units.map((unit) => {
-              const partnerNodes = unit.partners.map((id) => nodeById[id]).filter(Boolean);
-              const childNodes = unit.children.map((id) => nodeById[id]).filter(Boolean);
-              return (
-                <div key={unit.id} className="card text-sm">
-                  <div className="flex flex-wrap gap-1.5 items-center">
-                    {partnerNodes.map((n, i) => (
-                      <span key={n.id}>
-                        {i > 0 && <span className="text-bark-400 mx-1">&amp;</span>}
-                        <Link
-                          href={`/person/${n.id}`}
-                          className="font-medium text-bark-700 hover:text-amber-700"
-                        >
-                          {n.person.given_name} {n.person.family_name ?? ""}
-                        </Link>
-                      </span>
-                    ))}
-                    {unit.marriage_year && (
-                      <span className="badge badge-gray ml-1">m. {unit.marriage_year}</span>
-                    )}
-                  </div>
-                  {childNodes.length > 0 && (
-                    <div className="mt-1 text-bark-500 text-xs">
-                      Children:{" "}
-                      {childNodes.map((n, i) => (
-                        <span key={n.id}>
-                          {i > 0 && ", "}
-                          <Link
-                            href={`/person/${n.id}`}
-                            className="hover:text-amber-700 transition-colors"
-                          >
-                            {n.person.given_name}
-                          </Link>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </details>
-      )}
     </div>
   );
 }
 
-// ─────────────────────────────────────────────
-// Person card
-// ─────────────────────────────────────────────
+// ─── Person card ─────────────────────────────────────────────────────────────
 
 function PersonCard({
   node,
@@ -148,7 +213,6 @@ function PersonCard({
   node: FamilyNode;
   isHighlighted: boolean;
   onHover: (id: string | null) => void;
-  units: Array<{ id: string }>;
 }) {
   const tierColor = {
     member: "bg-bark-600",
@@ -166,6 +230,7 @@ function PersonCard({
   return (
     <Link
       href={`/person/${node.id}`}
+      data-pid={node.id}
       onMouseEnter={() => onHover(node.id)}
       onMouseLeave={() => onHover(null)}
       className={`group block rounded-xl border p-3 w-40 transition-all duration-150 ${
@@ -184,26 +249,18 @@ function PersonCard({
             <User className="w-6 h-6 text-bark-400" />
           )}
         </div>
-        {/* Tier dot */}
         <span
           className={`absolute bottom-0 right-[calc(50%-24px)] w-3 h-3 rounded-full border-2 border-white ${tierColor}`}
         />
       </div>
 
-      {/* Name */}
       <p className="text-center text-sm font-medium text-bark-700 leading-tight truncate">
         {node.person.given_name}
       </p>
       {node.person.family_name && (
         <p className="text-center text-xs text-bark-500 truncate">{node.person.family_name}</p>
       )}
-
-      {/* Years */}
-      {years && (
-        <p className="text-center text-xs text-bark-400 mt-0.5">{years}</p>
-      )}
-
-      {/* Recordings count */}
+      {years && <p className="text-center text-xs text-bark-400 mt-0.5">{years}</p>}
       {node.recordings_count > 0 && (
         <div className="mt-2 flex items-center justify-center gap-1 text-xs text-amber-600">
           <Mic className="w-3 h-3" />
@@ -214,54 +271,66 @@ function PersonCard({
   );
 }
 
-// ─────────────────────────────────────────────
-// Generation depth via BFS
-// ─────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function computeGenerations(graph: FamilyGraph): Record<string, number> {
   const gen: Record<string, number> = {};
-  const childOf: Record<string, string[]> = {};
-
-  // Build child → family_unit mappings
-  for (const unit of graph.units) {
-    for (const childId of unit.children) {
-      childOf[childId] = [...(childOf[childId] ?? []), unit.id];
-    }
-  }
-
-  // Build parent lookup: person → parent people (via family units)
   const parentOf: Record<string, string[]> = {};
+
   for (const unit of graph.units) {
     for (const childId of unit.children) {
       parentOf[childId] = [...(parentOf[childId] ?? []), ...unit.partners];
     }
   }
 
-  // BFS from roots (nodes with no parents)
   const roots = graph.nodes
     .map((n) => n.id)
     .filter((id) => !parentOf[id] || parentOf[id].length === 0);
 
-  const queue = roots.map((id) => ({ id, g: 0 }));
-  for (const { id, g } of queue) {
+  const queue: { id: string; g: number }[] = roots.map((id) => ({ id, g: 0 }));
+  for (let i = 0; i < queue.length; i++) {
+    const { id, g } = queue[i];
     if (gen[id] !== undefined) continue;
     gen[id] = g;
-    // Find children of this person
     for (const unit of graph.units) {
       if (unit.partners.includes(id)) {
         for (const childId of unit.children) {
-          if (gen[childId] === undefined) {
-            queue.push({ id: childId, g: g + 1 });
-          }
+          if (gen[childId] === undefined) queue.push({ id: childId, g: g + 1 });
         }
       }
     }
   }
 
-  // Assign any unvisited nodes (disconnected)
   for (const n of graph.nodes) {
     if (gen[n.id] === undefined) gen[n.id] = 0;
   }
 
   return gen;
+}
+
+/** Within a generation, sort so that partners from the same family unit are adjacent. */
+function orderPartnersAdjacent(people: FamilyNode[], graph: FamilyGraph): FamilyNode[] {
+  const placed = new Set<string>();
+  const result: FamilyNode[] = [];
+
+  for (const unit of graph.units) {
+    const inGen = unit.partners.filter((id) => people.some((p) => p.id === id));
+    if (inGen.length >= 2) {
+      for (const pid of inGen) {
+        if (!placed.has(pid)) {
+          const node = people.find((p) => p.id === pid);
+          if (node) { result.push(node); placed.add(pid); }
+        }
+      }
+    }
+  }
+
+  for (const person of people) {
+    if (!placed.has(person.id)) {
+      result.push(person);
+      placed.add(person.id);
+    }
+  }
+
+  return result;
 }

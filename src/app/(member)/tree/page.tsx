@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import FamilyTreeView from "@/components/FamilyTree";
+import AddPersonButton from "@/components/AddPersonButton";
 import type { FamilyGraph } from "@/types";
 
 export const metadata = { title: "Family Tree" };
@@ -77,7 +78,10 @@ export default async function TreePage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-serif text-bark-700">Family Tree</h1>
-        <span className="badge badge-gray">{people.length} people</span>
+        <div className="flex items-center gap-2">
+          <span className="badge badge-gray">{people.length} people</span>
+          <AddPersonButton graph={graph} />
+        </div>
       </div>
       <FamilyTreeView graph={graph} />
     </div>

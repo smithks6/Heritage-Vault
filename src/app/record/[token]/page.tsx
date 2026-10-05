@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/server";
-import { signSession, COOKIE_NAME, COOKIE_MAX_AGE } from "@/lib/tokens";
+import { verifySession, COOKIE_NAME } from "@/lib/tokens";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 import ContributorRecorder from "@/components/recorder/ContributorRecorder";
 import { BookOpen } from "lucide-react";
 
@@ -12,9 +13,20 @@ export const metadata = { title: "Record a memory" };
 
 export default async function RecordPage({ params }: Props) {
   const { token } = await params;
+
+  // Check if the contributor session cookie is already set
+  const cookieStore = await cookies();
+  const cookieValue = cookieStore.get(COOKIE_NAME)?.value;
+  const session = cookieValue ? await verifySession(cookieValue) : null;
+
+  // No valid cookie → exchange route sets it and redirects back here
+  if (!session) {
+    redirect(`/api/record/exchange?t=${token}`);
+  }
+
+  // Cookie is valid — load the person + request for the recorder UI
   const supabase = createServiceClient();
 
-  // Validate token
   const { data: tokenRow } = await supabase
     .from("contributor_tokens")
     .select("*, person:people(*), request:recording_requests(*)")
@@ -22,48 +34,12 @@ export default async function RecordPage({ params }: Props) {
     .is("revoked_at", null)
     .single();
 
-  const now = new Date();
-
-  if (
-    !tokenRow ||
-    new Date(tokenRow.expires_at) < now
-  ) {
-    return (
-      <InvalidToken reason={!tokenRow ? "not_found" : "expired"} />
-    );
+  if (!tokenRow || new Date(tokenRow.expires_at) < new Date()) {
+    return <InvalidToken reason={!tokenRow ? "not_found" : "expired"} />;
   }
-
-  // Exchange token → signed httpOnly cookie
-  const session = {
-    token_id: tokenRow.id,
-    person_id: tokenRow.person_id,
-    vault_id: tokenRow.vault_id,
-    request_id: tokenRow.request_id ?? null,
-    expires_at: tokenRow.expires_at,
-  };
-
-  const signed = await signSession(session);
-  const cookieStore = await cookies();
-  cookieStore.set(COOKIE_NAME, signed, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: COOKIE_MAX_AGE,
-    path: "/",
-  });
-
-  // Increment use count
-  await supabase
-    .from("contributor_tokens")
-    .update({ used_count: tokenRow.used_count + 1 })
-    .eq("id", tokenRow.id);
-
-  const person = tokenRow.person;
-  const request = tokenRow.request;
 
   return (
     <div className="min-h-screen bg-parchment-100 flex flex-col">
-      {/* Minimal header */}
       <header className="bg-parchment-50 border-b border-parchment-300 px-4 py-3">
         <div className="flex items-center gap-2 max-w-lg mx-auto">
           <div className="w-7 h-7 rounded-lg bg-bark-600 flex items-center justify-center">
@@ -73,12 +49,11 @@ export default async function RecordPage({ params }: Props) {
         </div>
       </header>
 
-      {/* Recorder */}
       <main className="flex-1 flex flex-col items-center justify-start px-4 py-8">
         <div className="w-full max-w-lg">
           <ContributorRecorder
-            person={person}
-            request={request}
+            person={tokenRow.person}
+            request={tokenRow.request}
             vaultId={session.vault_id}
           />
         </div>
