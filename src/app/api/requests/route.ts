@@ -7,7 +7,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { generateToken } from "@/lib/tokens";
+import { generateToken, hashToken } from "@/lib/tokens";
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
   // Generate contributor token
   const token = generateToken();
   const { error: tokenErr } = await service.from("contributor_tokens").insert({
-    token,
+    token_hash: await hashToken(token),
     person_id: subject_person_id,
     vault_id: membership.vault_id,
     request_id: request.id,

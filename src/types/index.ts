@@ -73,7 +73,7 @@ export interface RecordingRequest {
 
 export interface ContributorToken {
   id: string;
-  token: string;
+  token_hash: string; // SHA-256 hex; the raw token is never stored
   person_id: string;
   vault_id: string;
   request_id: string | null;

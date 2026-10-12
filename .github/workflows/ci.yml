@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  app:
+    name: Typecheck and build
+    runs-on: ubuntu-latest
+    env:
+      # Build-time placeholders only; no provider is called during CI.
+      NEXT_PUBLIC_SUPABASE_URL: http://127.0.0.1:54321
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ci-placeholder
+      SUPABASE_SERVICE_ROLE_KEY: ci-placeholder
+      PROVIDER_TRANSCRIPTION: fake
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run check:service-role
+      - run: npm run build
+
+  database:
+    name: Migrations, seed and RLS denial suite
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.118.0
+      # Starting the stack applies every migration and seed.sql, so a broken
+      # migration or seed fails here. Auth must run: it owns auth.identities
+      # and the current auth.uid().
+      - run: supabase start -x studio,imgproxy,edge-runtime,vector,supavisor,postgres-meta,mailpit
+      - run: supabase test db
+      - if: always()
+        run: supabase stop --no-backup

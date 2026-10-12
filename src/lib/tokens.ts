@@ -32,6 +32,17 @@ export function generateToken(): string {
   return randomBytes(32).toString("hex");
 }
 
+/**
+ * SHA-256 of a raw token, hex-encoded. This is the only form stored in
+ * contributor_tokens.token_hash; the raw token exists only in the link.
+ */
+export async function hashToken(token: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 // ─────────────────────────────────────────────
 // Cookie signing (HMAC-SHA256)
 // ─────────────────────────────────────────────

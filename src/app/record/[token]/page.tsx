@@ -1,5 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/server";
-import { signSession, COOKIE_NAME, COOKIE_MAX_AGE } from "@/lib/tokens";
+import { signSession, hashToken, COOKIE_NAME, COOKIE_MAX_AGE } from "@/lib/tokens";
 import { cookies } from "next/headers";
 import ContributorRecorder from "@/components/recorder/ContributorRecorder";
 import { BookOpen } from "lucide-react";
@@ -18,7 +18,7 @@ export default async function RecordPage({ params }: Props) {
   const { data: tokenRow } = await supabase
     .from("contributor_tokens")
     .select("*, person:people(*), request:recording_requests(*)")
-    .eq("token", token)
+    .eq("token_hash", await hashToken(token))
     .is("revoked_at", null)
     .single();
 

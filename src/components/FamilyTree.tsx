@@ -3,10 +3,10 @@
 /**
  * FamilyTree — visual family tree renderer.
  *
- * Sprint 1 note: This is a CSS-grid placeholder that correctly models the
- * GEDCOM data shape (people + family_units) and passes Gate 1 requirements.
- * Sprint 6 spike will replace the layout engine with `family-chart` or
- * `d3-dag` based on the Week 3 verdict (remarriage + adopted-child test).
+ * Placeholder: a generation-grouped grid over the GEDCOM data shape
+ * (people + family_units). Gate 1 chose d3-dag for the real layout, built in
+ * Sprint 6 (docs/spikes/tree-layout-verdict.md). This grid becomes the
+ * below-phone-width fallback.
  *
  * Design: generations as horizontal rows, family units as vertical connectors.
  */
