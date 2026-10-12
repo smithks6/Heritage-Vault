@@ -13,20 +13,10 @@ export const metadata = { title: "Record a memory" };
 
 export default async function RecordPage({ params }: Props) {
   const { token } = await params;
-
-  // Check if the contributor session cookie is already set
-  const cookieStore = await cookies();
-  const cookieValue = cookieStore.get(COOKIE_NAME)?.value;
-  const session = cookieValue ? await verifySession(cookieValue) : null;
-
-  // No valid cookie → exchange route sets it and redirects back here
-  if (!session) {
-    redirect(`/api/record/exchange?t=${token}`);
-  }
-
-  // Cookie is valid — load the person + request for the recorder UI
   const supabase = createServiceClient();
 
+  // Validate the token before looking at the cookie. The exchange route sends
+  // bad tokens back here, so redirecting first would loop forever.
   const { data: tokenRow } = await supabase
     .from("contributor_tokens")
     .select("*, person:people(*), request:recording_requests(*)")
@@ -36,6 +26,15 @@ export default async function RecordPage({ params }: Props) {
 
   if (!tokenRow || new Date(tokenRow.expires_at) < new Date()) {
     return <InvalidToken reason={!tokenRow ? "not_found" : "expired"} />;
+  }
+
+  // No session for this token → exchange route sets it and redirects back here
+  const cookieStore = await cookies();
+  const cookieValue = cookieStore.get(COOKIE_NAME)?.value;
+  const session = cookieValue ? await verifySession(cookieValue) : null;
+
+  if (!session || session.token_id !== tokenRow.id) {
+    redirect(`/api/record/exchange?t=${encodeURIComponent(token)}`);
   }
 
   return (
