@@ -22,6 +22,9 @@ export default async function MemberLayout({
     .eq("user_id", user.id)
     .single();
 
+  // First-time user: no vault yet → onboarding
+  if (!membership) redirect("/setup");
+
   return (
     <div className="min-h-screen flex flex-col">
       <MemberNav user={user} membership={membership} />

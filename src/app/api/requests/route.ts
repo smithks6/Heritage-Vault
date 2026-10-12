@@ -91,7 +91,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Could not create token" }, { status: 500 });
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+  const proto = req.headers.get("x-forwarded-proto") ?? "https";
+  const host = req.headers.get("x-forwarded-host") ?? req.nextUrl.host;
+  const appUrl = `${proto}://${host}`;
   const inviteLink = `${appUrl}/record/${token}`;
 
   return NextResponse.json({

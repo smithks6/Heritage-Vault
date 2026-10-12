@@ -32,10 +32,11 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  // ─── Protect /tree, /person, /search, /requests (member routes) ────────
+  // ─── Protect /tree, /person, /recording, /search, /requests (member routes)
   const isMemberRoute =
     pathname.startsWith("/tree") ||
     pathname.startsWith("/person") ||
+    pathname.startsWith("/recording") ||
     pathname.startsWith("/search") ||
     pathname.startsWith("/requests");
 

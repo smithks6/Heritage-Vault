@@ -6,3 +6,4 @@ node_modules
 /supabase/.temp/
 .DS_Store
 *.tsbuildinfo
+.claude/settings.local.json

@@ -15,6 +15,7 @@
     "check:service-role": "bash scripts/check-service-role.sh"
   },
   "dependencies": {
+    "@supabase/server": "^1.9.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.0",
     "autoprefixer": "^10.6.1",
