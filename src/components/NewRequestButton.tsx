@@ -6,10 +6,9 @@ import { Plus, X, Mic, Video, Copy, CheckCheck, Loader2 } from "lucide-react";
 interface Props {
   personId: string;
   personName: string;
-  memberId: string;
 }
 
-export default function NewRequestButton({ personId, personName, memberId }: Props) {
+export default function NewRequestButton({ personId, personName }: Props) {
   const [open, setOpen] = useState(false);
   const [subject, setSubject] = useState("");
   const [medium, setMedium] = useState<"audio" | "video">("audio");

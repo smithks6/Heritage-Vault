@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { Bell, Mic, Video, Clock, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Bell, Mic, Video, Clock, CheckCircle2, XCircle } from "lucide-react";
 import type { RecordingRequest, Person, VaultMember } from "@/types";
 
 export const metadata = { title: "Requests" };

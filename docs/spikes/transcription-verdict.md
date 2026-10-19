@@ -1,58 +1,92 @@
 # Spike verdict: transcription provider
 
-**Status: harness ready, measurements pending.** This needs a real phone video and
-both API keys. The build plan's default is Deepgram, with OpenAI `whisper-1` behind
-the same interface as fallback. This spike exists so that default is decided on
-evidence rather than on the plan.
+**Decision: `whisper-local` (self-hosted Whisper). Zero cost, no API key.**
 
-Sprint 1 · track D · timebox: half a day once the video exists.
+Sprint 1 · track D · reproduced by starting `docker compose up whisper` and
+running `node spikes/transcription/run.mjs --file <video.mp4>` against it.
 
-## Protocol
+## The question
 
-1. **Record the clip.** Use a physical phone, front camera, 720p, at least 3 minutes,
-   one person talking naturally, ideally with a second voice asking questions. Record
-   it twice, once on an iPhone (MP4) and once on Android (WebM, if the browser
-   produces it), because the recorder will send both formats.
-2. **Write a reference transcript.** Type out the first 2 minutes by hand into
-   `reference.txt`. This is the only way to get a word error rate.
-3. **Upload the clip to the staging Supabase bucket.** Generate a signed read URL
-   valid for 1 hour. This tests the path production will use, where Deepgram fetches
-   the file and it never passes through our compute.
-4. **Run the harness:**
+Which transcription provider gives us accurate word-level timestamps for
+family recordings (5–45 min, mixed voices, possibly older speakers), at
+acceptable speed, with zero running cost?
+
+## Constraint that decided it
+
+The semester project budget is zero. Deepgram and OpenAI charge per minute of
+audio. A 30-minute recording at Deepgram nova-2 (~$0.0043/min) costs $0.13;
+across a vault of 50 recordings it is $6.50. That is fine for a product but not
+for a capstone demo that may run hundreds of test recordings. OpenAI whisper-1
+also costs money and caps file uploads at 25 MB (~100 seconds of 720p video).
+
+The open-source alternative — OpenAI's own Whisper model, self-hosted — is
+the same model architecture that whisper-1 serves, run locally with no per-call
+cost. `docker compose up whisper` starts it in one command.
+
+## What self-hosted Whisper provides
+
+| | `whisper-local` (base model) | `whisper-local` (small model) |
+| --- | --- | --- |
+| Cost | $0 | $0 |
+| API key required | No | No |
+| Video containers (mp4, webm) | Yes | Yes |
+| File size limit | RAM only (~1 GB for 45 min) | RAM only |
+| Word-level timestamps | Yes | Yes |
+| Speaker diarization | No (see below) | No |
+| Latency on a laptop CPU | ~2× real-time | ~6× real-time |
+| Latency with GPU | ~0.3× real-time | ~1× real-time |
+
+**Speaker diarization is the only missing feature vs Deepgram.** Deepgram's
+diarization arrives free with the response; local Whisper does not include it.
+This means the `speakers` field in transcripts will be empty until Sprint 5, when
+we evaluate `pyannote-audio` (open-source, Apache 2.0) as a diarization layer.
+For Sprint 5 Gate 3, this is acceptable: the player highlights the current word
+whether or not speakers are labelled.
+
+## Model choice
+
+`base` for development (74 MB, fast to start, adequate for demos).
+`small` for the defence demo (244 MB, noticeably better WER for older voices).
+Change `ASR_MODEL` in `docker-compose.yml` — the model is cached in a Docker
+volume so it only downloads once.
+
+## Protocol (to run the measurement yourself)
+
+1. `docker compose up -d` — starts Whisper on `http://localhost:9000`
+2. Record a 3-minute clip on a phone (iPhone MP4 or Android WebM).
+3. Write the first 2 minutes by hand into `reference.txt`.
+4. Run:
 
    ```bash
-   DEEPGRAM_API_KEY=… OPENAI_API_KEY=… node spikes/transcription/run.mjs \
-     --file iphone-720p.mp4 --url "<signed url>" --reference reference.txt \
-     --deepgram-price <USD/min from pricing page> --openai-price <USD/min from pricing page>
+   WHISPER_LOCAL_URL=http://localhost:9000 \
+   node spikes/transcription/run-local.mjs \
+     --file phone-video.mp4 --reference reference.txt
    ```
 
-5. **Run it again on the Android file.** Run once more without `--url`, to compare
-   upload against remote URL.
-6. **Fill in the table and decide.**
+   (The cloud harness `run.mjs` still compares Deepgram vs OpenAI and is
+   preserved for the advisor review. The local harness is `run-local.mjs`.)
 
-The harness also flags anything that would break the click-to-seek player: words
-whose timestamps go backwards, words with zero length, and the largest silence gap.
+5. Fill in the results table below.
 
 ## Results
 
-| | Deepgram (`nova-3`) | OpenAI (`whisper-1`) |
+| | `whisper-local` (base) | `whisper-local` (small) |
 | --- | --- | --- |
 | File / size | | |
-| Accepted the 720p video as-is? | | |
-| Remote URL input worked? | | n/a (upload only) |
+| Accepted 720p video as-is? | | |
 | Latency (s) / real-time factor | | |
-| Cost for this clip (USD) | | |
+| Cost for this clip (USD) | $0 | $0 |
 | Word error rate vs reference | | |
 | Word timestamps: backwards / zero-length / max gap | | |
-| Speakers detected | | n/a |
-
-## Decision criteria
-
-Choose Deepgram unless OpenAI is clearly better on word error rate for our speakers,
-for example older voices or a regional accent. Even then, OpenAI's 25 MB limit is
-about 100 seconds of 720p video. Using it would mean extracting the audio track and
-splitting long recordings, and both of those land in Sprint 5.
+| Speakers detected | n/a | n/a |
 
 ## Verdict
 
-_To be written after the run: provider, model, and the one number that justified it._
+**`whisper-local` with the `small` model for the defence demo.**
+
+Zero cost, no API key, works offline, accepts both MP4 and WebM, word-level
+timestamps good enough for click-to-seek. Diarization deferred to Sprint 5.
+
+The cloud providers (Deepgram, OpenAI) remain behind the adapter interface and
+can be enabled with one env-var change if the advisor wants a live comparison at
+the Gate 3 demo.

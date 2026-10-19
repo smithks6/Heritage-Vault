@@ -13,6 +13,7 @@ const FIXTURE_TRANSCRIPT =
   "interface without any external API keys or real audio files.";
 
 export class FakeProvider implements TranscriptionProvider {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async transcribe(_req: TranscriptionRequest): Promise<TranscriptionResult> {
     const words = FIXTURE_TRANSCRIPT.split(/\s+/);
     const wordTimings = words.map((word, i) => ({

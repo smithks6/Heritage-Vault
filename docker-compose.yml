@@ -1,0 +1,44 @@
+# Heritage Vault — self-hosted services
+#
+# Starts the Whisper speech-to-text service so the app can transcribe
+# recordings without any paid API keys.
+#
+# Usage:
+#   docker compose up -d          # start Whisper in the background
+#   docker compose down           # stop
+#   docker compose logs whisper   # check for errors
+#
+# Then set in .env.local:
+#   PROVIDER_TRANSCRIPTION=whisper-local
+#   WHISPER_LOCAL_URL=http://localhost:9000
+#
+# The database is managed separately via the Supabase CLI:
+#   npx supabase start             # start Postgres + Auth + Storage + Studio
+#   npx supabase stop              # stop
+
+services:
+  whisper:
+    # CPU-only image — works on any machine without NVIDIA drivers.
+    # Swap for "latest" (no -cpu suffix) if you have an NVIDIA GPU.
+    image: onerahmet/openai-whisper-asr-webservice:latest-cpu
+    ports:
+      - "9000:9000"
+    environment:
+      # Model sizes: tiny (~39 MB) | base (~74 MB) | small (~244 MB) | medium (~769 MB)
+      # "base" is the best balance of speed and accuracy for a laptop without a GPU.
+      # Change to "small" for noticeably better accuracy at ~3× slower transcription.
+      ASR_MODEL: base
+      ASR_ENGINE: openai_whisper
+    volumes:
+      # Cache the downloaded model between container restarts
+      - whisper-models:/root/.cache/whisper
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/docs"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s   # model download takes ~1 min on first boot
+
+volumes:
+  whisper-models:

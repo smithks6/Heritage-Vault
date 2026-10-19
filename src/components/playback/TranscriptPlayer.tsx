@@ -10,7 +10,7 @@
  *  - Speaker labels from diarization data
  */
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Play, Pause, Volume2, Mic } from "lucide-react";
 import type { Transcript, WordTiming } from "@/types";
 
@@ -33,7 +33,10 @@ export default function TranscriptPlayer({ playbackUrl, mimeType, transcript, du
   const activeWordRef = useRef<HTMLSpanElement | null>(null);
 
   const isVideo = mimeType.startsWith("video");
-  const wordTimings: WordTiming[] = transcript?.word_timings ?? [];
+  const wordTimings: WordTiming[] = useMemo(
+    () => transcript?.word_timings ?? [],
+    [transcript]
+  );
 
   // Keep current word in view
   useEffect(() => {

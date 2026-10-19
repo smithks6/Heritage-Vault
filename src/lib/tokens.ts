@@ -20,16 +20,11 @@ const COOKIE_MAX_AGE = 60 * 60 * 4; // 4 hours
 
 /** Generate a cryptographically random 32-byte hex token. */
 export function generateToken(): string {
-  if (typeof crypto !== "undefined" && crypto.getRandomValues) {
-    const bytes = new Uint8Array(32);
-    crypto.getRandomValues(bytes);
-    return Array.from(bytes)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("");
-  }
-  // Node fallback
-  const { randomBytes } = require("crypto") as typeof import("crypto");
-  return randomBytes(32).toString("hex");
+  const bytes = new Uint8Array(32);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 /**

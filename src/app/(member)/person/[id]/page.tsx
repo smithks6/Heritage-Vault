@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { Mic, Video, Clock, ChevronRight, Plus, User } from "lucide-react";
+import { Mic, Video, Clock, ChevronRight, User } from "lucide-react";
 import NewRequestButton from "@/components/NewRequestButton";
-import type { MediaAsset, Person } from "@/types";
+import type { MediaAsset } from "@/types";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -93,7 +93,6 @@ export default async function PersonPage({ params }: { params: Promise<{ id: str
           <NewRequestButton
             personId={person.id}
             personName={`${person.given_name} ${person.family_name ?? ""}`.trim()}
-            memberId={membership.id}
           />
         )}
       </div>

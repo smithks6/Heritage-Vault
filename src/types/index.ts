@@ -8,7 +8,7 @@ export type RecordingMedium = "audio" | "video";
 export type RequestStatus = "pending" | "fulfilled" | "expired" | "declined";
 export type Privacy = "admin" | "family" | "exportable";
 export type TranscriptionStatus = "pending" | "processing" | "done" | "failed";
-export type TranscriptionProvider = "deepgram" | "openai" | "fake";
+export type TranscriptionProvider = "deepgram" | "openai" | "fake" | "whisper-local";
 
 export interface Vault {
   id: string;

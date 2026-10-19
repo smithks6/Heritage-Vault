@@ -12,7 +12,7 @@
  *   Feature-detected with MediaRecorder.isTypeSupported()
  */
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Mic, Video, Square, RotateCcw, Send, CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import type { Person, RecordingRequest } from "@/types";
 
@@ -63,7 +63,7 @@ function formatTime(seconds: number): string {
 // Max duration: 90 minutes
 const MAX_DURATION_SECONDS = 90 * 60;
 
-export default function ContributorRecorder({ person, request, vaultId }: Props) {
+export default function ContributorRecorder({ person, request }: Props) {
   const medium: "audio" | "video" = request?.medium ?? "audio";
   const isVideo = medium === "video";
 
@@ -227,8 +227,6 @@ export default function ContributorRecorder({ person, request, vaultId }: Props)
   }
 
   // ─── Render ───────────────────────────────────────────────────────────
-
-  const personName = `${person.given_name} ${person.family_name ?? ""}`.trim();
 
   if (state === "done") {
     return (

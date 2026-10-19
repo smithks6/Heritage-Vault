@@ -54,7 +54,7 @@ export default function SetupPage() {
           </div>
           <h1 className="font-serif text-3xl text-bark-700">Create your Vault</h1>
           <p className="text-sm text-bark-400">
-            Your family's memories live here. You can invite others after setup.
+            Your family&apos;s memories live here. You can invite others after setup.
           </p>
         </div>
 
@@ -128,7 +128,7 @@ export default function SetupPage() {
         </form>
 
         <p className="text-center text-xs text-bark-300">
-          You'll be the vault administrator. Additional family members can be
+          You&apos;ll be the vault administrator. Additional family members can be
           added from the tree view.
         </p>
       </div>
