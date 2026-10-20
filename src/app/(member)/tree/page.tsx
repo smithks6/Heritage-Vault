@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import FamilyTreeView from "@/components/FamilyTree";
 import AddPersonButton from "@/components/AddPersonButton";
 import type { FamilyGraph } from "@/types";
-
+import ActivityLog from '@/components/ActivityLog';
 export const metadata = { title: "Family Tree" };
 
 export default async function TreePage() {
@@ -84,6 +84,8 @@ export default async function TreePage() {
         </div>
       </div>
       <FamilyTreeView graph={graph} />
+      {/* Activity Log Feed */}
+      <ActivityLog />
     </div>
   );
 }
