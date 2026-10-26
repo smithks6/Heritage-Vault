@@ -25,6 +25,7 @@ on conflict (id) do nothing;
 -- ─────────────────────────────────────────────
 
 -- Vault members can read files in their vault
+drop policy if exists "vault_members_read" on storage.objects;
 create policy "vault_members_read"
   on storage.objects for select
   to authenticated
@@ -35,6 +36,7 @@ create policy "vault_members_read"
 
 -- Vault members can insert files into their vault (signed URL handles auth,
 -- but this covers any direct upload edge-cases)
+drop policy if exists "vault_members_insert" on storage.objects;
 create policy "vault_members_insert"
   on storage.objects for insert
   to authenticated
@@ -44,6 +46,7 @@ create policy "vault_members_insert"
   );
 
 -- Vault admins can delete files
+drop policy if exists "vault_admins_delete" on storage.objects;
 create policy "vault_admins_delete"
   on storage.objects for delete
   to authenticated

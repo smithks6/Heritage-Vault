@@ -5,17 +5,32 @@
  * Parses the Deepgram webhook body and writes the transcript to Supabase.
  */
 
+import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/server";
 import { parseDeepgramResponse } from "@/lib/providers/deepgram";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Length-safe constant-time comparison. */
+function secretMatches(incoming: string, configured: string): boolean {
+  const a = Buffer.from(incoming);
+  const b = Buffer.from(configured);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
 export async function POST(req: NextRequest) {
-  // Simple secret check (add DEEPGRAM_WEBHOOK_SECRET to .env for production)
-  const secret = req.headers.get("x-heritage-webhook-secret");
-  if (
-    process.env.DEEPGRAM_WEBHOOK_SECRET &&
-    secret !== process.env.DEEPGRAM_WEBHOOK_SECRET
-  ) {
+  // This handler writes with the service-role client, which bypasses RLS, so
+  // it must never be reachable unauthenticated — regardless of which
+  // transcription provider is configured. Fail closed when no secret is set.
+  const configuredSecret = process.env.DEEPGRAM_WEBHOOK_SECRET;
+  if (!configuredSecret) {
+    console.error("[callback] DEEPGRAM_WEBHOOK_SECRET is not set; refusing the request");
+    return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
+  }
+  const incomingSecret = req.headers.get("x-heritage-webhook-secret");
+  if (!incomingSecret || !secretMatches(incomingSecret, configuredSecret)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -23,6 +38,9 @@ export async function POST(req: NextRequest) {
   const assetId = req.headers.get("x-heritage-asset-id");
   if (!assetId) {
     return NextResponse.json({ error: "Missing asset ID header" }, { status: 400 });
+  }
+  if (!UUID_RE.test(assetId)) {
+    return NextResponse.json({ error: "Malformed asset ID header" }, { status: 400 });
   }
 
   const data = await req.json();

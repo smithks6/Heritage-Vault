@@ -16,6 +16,28 @@ interface SearchResult {
   snippet: string;
 }
 
+/**
+ * Render a ts_headline snippet without trusting it as HTML.
+ *
+ * The search RPC wraps matches in <mark>…</mark> (StartSel/StopSel in
+ * 002_search_rpc.sql), but ts_headline does not escape the transcript text
+ * around them — so the snippet carries whatever was stored in
+ * transcripts.full_text. Split on the two known tags and let React escape
+ * every text segment. Worst case for a transcript that itself contains the
+ * literal "<mark>" is a stray highlight, never executable markup.
+ */
+function renderSnippet(snippet: string) {
+  return snippet.split(/(<mark>[\s\S]*?<\/mark>)/g).map((part, i) =>
+    part.startsWith("<mark>") && part.endsWith("</mark>") ? (
+      <mark key={i} className="bg-amber-200 rounded-sm px-0.5 text-bark-700">
+        {part.slice("<mark>".length, -"</mark>".length)}
+      </mark>
+    ) : (
+      part
+    )
+  );
+}
+
 export default async function SearchPage({
   searchParams,
 }: {
@@ -101,10 +123,9 @@ export default async function SearchPage({
                       </p>
                     )}
                     {/* Matched snippet with query highlight */}
-                    <p
-                      className="mt-1.5 text-sm text-bark-600 leading-relaxed line-clamp-2"
-                      dangerouslySetInnerHTML={{ __html: r.snippet }}
-                    />
+                    <p className="mt-1.5 text-sm text-bark-600 leading-relaxed line-clamp-2">
+                      {renderSnippet(r.snippet)}
+                    </p>
                   </div>
                 </div>
               </Link>

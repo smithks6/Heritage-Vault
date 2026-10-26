@@ -11,7 +11,11 @@ npm run dev
 ```
 
 Seeded accounts: `kyle@heritage.test` (admin) and `emma@heritage.test` (member), password `heritage-dev`.
-Seeded contributor link: `/record/dev-token-dorothy`.
+These exist only in the local stack started by `db:start`.
+
+No contributor link is seeded with a known token — a guessable one would be
+redeemable by anyone reading this repo. `supabase/seed.sql` carries a snippet
+that mints a fresh link on demand and prints the token once.
 
 **GitHub Codespaces:** if `db:start` fails with `DbSetupError` and a Postgres
 connection timeout, the codespace's legacy iptables `FORWARD` policy is dropping

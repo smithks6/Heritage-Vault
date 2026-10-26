@@ -16,7 +16,8 @@
 --   emma@heritage.test  member
 --
 -- Local contributor link for the walking skeleton:
---   /record/dev-token-dorothy  (only its SHA-256 is stored)
+--   none is seeded with a known value — see the contributor_tokens block
+--   below for the snippet that mints one on demand.
 
 -- ─────────────────────────────────────────────
 -- Vault
@@ -156,8 +157,26 @@ INSERT INTO recording_requests (id, vault_id, requester_id, subject_person_id, s
    'The year you and Dad were married', 'audio', 'declined',
    now() + interval '30 days', NULL, '2026-09-01 12:00:00+00');
 
+-- Contributor token.
+--
+-- The hash below has a random, discarded preimage, so the row exists for shape
+-- and foreign-key purposes but no one holds a usable link. Do NOT seed a token
+-- with a known plaintext: this file is public, and anyone could then redeem it.
+--
+-- To mint a working contributor link (local dev), run this and visit
+-- /record/<the returned token>:
+--
+--   WITH t AS (SELECT encode(extensions.gen_random_bytes(32), 'hex') AS tok)
+--   INSERT INTO contributor_tokens (token_hash, person_id, vault_id, request_id, expires_at)
+--   SELECT encode(extensions.digest(t.tok, 'sha256'), 'hex'),
+--          '10000000-0000-0000-0000-000000000004',
+--          '00000000-0000-0000-0000-000000000001',
+--          '40000000-0000-0000-0000-000000000002',
+--          now() + interval '7 days'
+--   FROM t
+--   RETURNING (SELECT tok FROM t) AS visit_this_token;
 INSERT INTO contributor_tokens (token_hash, person_id, vault_id, request_id, expires_at) VALUES
-  (encode(extensions.digest('dev-token-dorothy', 'sha256'), 'hex'),
+  (encode(extensions.digest(encode(extensions.gen_random_bytes(32), 'hex'), 'sha256'), 'hex'),
    '10000000-0000-0000-0000-000000000004', '00000000-0000-0000-0000-000000000001',
    '40000000-0000-0000-0000-000000000002', now() + interval '30 days');
 

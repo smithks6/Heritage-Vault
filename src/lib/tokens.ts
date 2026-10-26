@@ -43,8 +43,15 @@ export async function hashToken(token: string): Promise<string> {
 // ─────────────────────────────────────────────
 
 async function getSigningKey(): Promise<CryptoKey> {
-  const secret = process.env.TOKEN_COOKIE_SECRET ?? "dev-insecure-secret";
-  const raw = new TextEncoder().encode(secret);
+  const secret = process.env.TOKEN_COOKIE_SECRET;
+  if (!secret) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("TOKEN_COOKIE_SECRET must be set in production");
+    }
+    // Dev-only fallback — not safe for production
+    console.warn("[tokens] TOKEN_COOKIE_SECRET not set; using insecure dev default");
+  }
+  const raw = new TextEncoder().encode(secret ?? "dev-insecure-secret");
   return crypto.subtle.importKey("raw", raw, { name: "HMAC", hash: "SHA-256" }, false, [
     "sign",
     "verify",
