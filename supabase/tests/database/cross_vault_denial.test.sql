@@ -7,18 +7,19 @@
 --   Vault A (aaaaaaaa-…)  alice = admin, amy = member
 --   Vault B (bbbbbbbb-…)  bob   = admin
 --
--- Every one of the 13 tables gets a row in vault A. Bob must see none of them,
+-- Every one of the 14 tables gets a row in vault A. Bob must see none of them,
 -- and Alice must see all of them, so a denial can never pass just because the
 -- table happened to be empty.
 --
 -- ID scheme: <vault>-0000-0000-<table>-<n>
 --   0001 people  0002 family_units  0003 vault_members  0004 recording_requests
 --   0005 contributor_tokens  0006 media_assets  0008 tags  0009 audit_log
+--   0010 activity_logs
 
 BEGIN;
 CREATE EXTENSION IF NOT EXISTS pgtap WITH SCHEMA extensions;
 
-SELECT plan(49);
+SELECT plan(52);
 
 -- ─────────────────────────────────────────────
 -- Fixture (as postgres, the table owner, so RLS does not apply)
@@ -82,6 +83,14 @@ INSERT INTO media_tags (media_asset_id, tag_id) VALUES
 INSERT INTO audit_log (id, vault_id, actor_type, action) VALUES
   ('aaaaaaaa-0000-0000-0009-000000000001', 'aaaaaaaa-0000-0000-0000-000000000000', 'system', 'test');
 
+-- One vault A log line, plus an unattached one: vault_id is nullable here, and
+-- a row with no vault must not fall through to every signed-in user.
+INSERT INTO activity_logs (id, vault_id, user_id, action_type, description) VALUES
+  ('aaaaaaaa-0000-0000-0010-000000000001', 'aaaaaaaa-0000-0000-0000-000000000000',
+   'a1a1a1a1-0000-0000-0000-000000000000', 'test', 'alice did a thing in vault A'),
+  ('aaaaaaaa-0000-0000-0010-000000000002', NULL,
+   NULL, 'test', 'orphaned log line with no vault');
+
 -- Vault A rows per table, as seen by the current role.
 CREATE FUNCTION pg_temp.vault_a_rows()
 RETURNS TABLE (tbl TEXT, n BIGINT) LANGUAGE sql AS $$
@@ -97,7 +106,8 @@ RETURNS TABLE (tbl TEXT, n BIGINT) LANGUAGE sql AS $$
   SELECT 'transcripts',        count(*) FROM public.transcripts        WHERE media_asset_id::text LIKE 'aaaaaaaa-%' UNION ALL
   SELECT 'tags',               count(*) FROM public.tags               WHERE vault_id = 'aaaaaaaa-0000-0000-0000-000000000000' UNION ALL
   SELECT 'media_tags',         count(*) FROM public.media_tags         WHERE media_asset_id::text LIKE 'aaaaaaaa-%' UNION ALL
-  SELECT 'audit_log',          count(*) FROM public.audit_log          WHERE vault_id = 'aaaaaaaa-0000-0000-0000-000000000000'
+  SELECT 'audit_log',          count(*) FROM public.audit_log          WHERE vault_id = 'aaaaaaaa-0000-0000-0000-000000000000' UNION ALL
+  SELECT 'activity_logs',      count(*) FROM public.activity_logs      WHERE vault_id = 'aaaaaaaa-0000-0000-0000-000000000000'
 $$;
 GRANT EXECUTE ON FUNCTION pg_temp.vault_a_rows() TO anon, authenticated;
 
@@ -113,8 +123,8 @@ SELECT is(
 
 SELECT is(
   (SELECT count(*)::int FROM pg_tables WHERE schemaname = 'public'),
-  13,
-  'public has exactly the 13 known tables (a new table must be added to this suite)'
+  14,
+  'public has exactly the 14 known tables (a new table must be added to this suite)'
 );
 
 -- ─────────────────────────────────────────────
@@ -191,6 +201,12 @@ SELECT is(
   (SELECT count(*)::int FROM public.search_transcripts('aaaaaaaa-0000-0000-0000-000000000000', 'zanzibar')),
   2,
   'vault admin search finds both family and admin-only recordings'
+);
+
+SELECT is(
+  (SELECT count(*)::int FROM public.activity_logs WHERE vault_id IS NULL),
+  0,
+  'an activity_logs row with no vault is readable by nobody, not even a vault admin'
 );
 RESET ROLE;
 
